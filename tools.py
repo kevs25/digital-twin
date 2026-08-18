@@ -2,6 +2,7 @@ import json
 import os
 import requests
 from dotenv import load_dotenv
+from agents import function_tool
 
 load_dotenv(override=True)
 
@@ -11,7 +12,8 @@ pushover_token = os.getenv("PUSHOVER_TOKEN")
 pushover_url = "https://api.pushover.net/1/messages.json"
 
 
-def push(text):
+def push(text: str) -> str:
+    """Push a message to my phone"""
     requests.post(
         pushover_url,
         data={
@@ -21,13 +23,15 @@ def push(text):
         },
     )
 
-
-def record_user_details(email, name="Name not provided", notes="not provided"):
+@function_tool
+def record_user_details(email: str, name: str = "Name not provided", notes: str = "not provided") -> str:
+    """Use this tool to record that a user is interested in being in touch and provided an email address"""
     push(f"Recording interest from {name} with email {email} and notes {notes}")
     return "OK"
 
-
-def record_unknown_question(question):
+@function_tool
+def record_unknown_question(question: str) -> str:
+    """Use this tool to record any question that couldn't be answered as you didn't know the answer"""
     push(f"Recording {question} asked that I couldn't answer")
     return "OK"
 

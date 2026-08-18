@@ -1,32 +1,38 @@
 import os
-
-from openai import OpenAI
 from context import TWIN_SYSTEM_PROMPT
-from tools import tools, handle_tool_calls
+from tools import record_user_details, record_unknown_question
 from styles import CSS, JS, EXAMPLES
 from dotenv import load_dotenv
 import gradio as gr
+from agents import Agent, Runner
 
 load_dotenv(override=True)
 
 MODEL_NAME = "gpt-5.4-mini"
 
-openai = OpenAI()
+agent = Agent(
+    name="Digital Twin",
+    model=MODEL_NAME,
+    instructions=TWIN_SYSTEM_PROMPT,
+    tools=[record_user_details, record_unknown_question],
+)
 
-system = [{"role": "system", "content": TWIN_SYSTEM_PROMPT}]
+
+def extract_text(content):
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            part.get("text", "") for part in content if isinstance(part, dict) and part.get("type") == "text"
+        )
+    return str(content)
 
 
-def chat(message, history):
-    messages = system + history + [{"role": "user", "content": message}]
-    response = openai.chat.completions.create(model=MODEL_NAME, messages=messages, tools=tools)
-    while response.choices[0].finish_reason == "tool_calls":
-        message = response.choices[0].message
-        tool_calls = message.tool_calls
-        results = handle_tool_calls(tool_calls)
-        messages.append(message)
-        messages.extend(results)
-        response = openai.chat.completions.create(model=MODEL_NAME, messages=messages, tools=tools)
-    return response.choices[0].message.content
+async def chat(message, history):
+    clean_history = [{"role": item["role"], "content": extract_text(item["content"])} for item in history]
+    input_items = clean_history + [{"role": "user", "content": message}]
+    result = await Runner.run(agent, input_items)
+    return result.final_output
 
 
 if __name__ == "__main__":
